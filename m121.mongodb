@@ -1,0 +1,125 @@
+
+use('sample_mflix');
+
+var pipeline = [
+    {$match:{ $and:[{languages: {$in: ["Japanese"]}},{languages: {$in: ["English"]}}]}},
+    {$match:{ "imdb.rating": {$gte: 7}}},
+    {$match:{ $or:[{genres: {$nin: ["Horror", "Crime"]}}]}},
+    {$match:{ $or:[{rated: "PG"}, {rated:"G"}]}},
+    {$project: {"title": 1, "rated": 1, "_id": 0}},
+    {$project: {"title": {$split: [ "$title", " " ] }}},
+    {$project: {"title": { $cond: { if: { $size: "$title" }, then: {"$title" }, else: "NA"} }}}
+] 
+
+var pipeline = [
+        {$project: {"title":{$split: [ "$title", " " ]}}},
+        {$project: {size_of_title: {$size: "$title"} }},
+        {$match: {"size_of_title": {$eq: 1}}},
+        {$project: {"title": 1, "_id": 0 }},
+]
+
+db.movies.aggregate(pipeline);
+
+// db.movies.findOne()
+ // { $count: "type" }
+
+     db.movies.aggregate([
+        {$match: {
+          cast: { $elemMatch: { $exists: true }},
+          directors: { $elemMatch: { $exists: true }},
+          writers: { $elemMatch: { $exists: true }}
+        }},
+        {$project: {
+          _id: 0,
+          cast: 1,
+          directors: 1,
+          writers: {
+           $map: {
+             input: "$writers",
+             as: "writer",
+             in: {
+               $arrayElemAt: [
+                 {
+                   $split: ["$$writer", " ("]
+                 },
+                 0
+               ]
+             }
+           }
+         }
+       }
+      },
+      {$project:{"lovejoy":{ $gt: [{$size:{ $setIntersection: [ "$cast", "$writers", "$directors" ]}},0]}}},
+      {$match: {"lovejoy": true}},
+    ]).itcount()
+
+//chapter 2 homework 1
+     db.movies.aggregate([
+        {$match: {cast: { $elemMatch: { $exists: true } }}},
+        {$match:{ countries: {$in: ["USA"]}}},
+        {$match:{ "tomatoes.viewer.rating": {$gte: 3}}},
+        {$addFields: {favcast: {$filter:{
+            input: "$cast",
+            as: "fave",
+            cond: {$or: [
+              {$eq: ["$$fave", "Sandra Bullock"] },
+              {$eq: ["$$fave", "Tom Hanks"] },
+              {$eq: ["$$fave", "Julia Roberts"] },
+              {$eq: ["$$fave", "Kevin Spacey"] },
+              {$eq: ["$$fave", "George Clooney"] },
+            ]}
+        } } } },
+        {$addFields: { num_favs: 
+            {$reduce: { 
+                input: "$favcast",
+                initialValue: {sum: 0},
+                in: {
+                  sum: { $add : ["$$value.sum", 1] }
+                }
+              }}
+            }},
+        {$project: {title: 1, favcast: 1, num_favs: 1, _id: 0 }},
+        {$sort: { num_favs: -1, "tomatoes.viewer.rating": -1 , title: -1}},
+        {$skip : 20}
+    ])
+//chapter 2 homework 2
+// English is an available language, the minimum imdb.rating is at least 1, 
+// the minimum imdb.votes is at least 1, and it was released in 1990 or after. 
+// You'll be required to rescale (or normalize) imdb.votes.
+     db.movies.aggregate([
+       {$match:{ languages: {$in: ["English"]}}},
+       {$match:{ year: {$gte: 1990}}},
+       {$match:{ "imdb.rating": {$gte: 1}}},
+       {$match:{ "imdb.votes": {$gte: 1}}},
+       {$addFields:{ norm_rating: {
+        $add: [ 1, {
+            $multiply: [ 9, {
+                $divide: [
+                  { $subtract: ["$imdb.votes", 5] },
+                  { $subtract: [1521105, 5] }
+                ]
+              }
+            ]
+          }
+        ]
+      }}},
+      {$project: {title: 1, norm_rating:{ $avg: ["$norm_rating", "$imdb.rating"] }, _id: 0}},
+      {$sort: {norm_rating: 1}},
+      {$limit: 5}
+    ])
+
+// Chapter 3 lecture: The $group stage
+db.movies.aggregate([
+  {$match: {"metacritic": {$gte: 0}}},
+  {$group: {
+    _id: {
+      numDirectors: {
+        $cond: [{$isArray: "$directors"}, {$size: "$directors"}, 0]
+      }},
+    numFilms: {$sum: 1},
+    averageMetacritic: {$avg: "$metacritic"}
+  }},
+  {$sort: {"_id.directors": -1}}
+])
+
+// Chapter 3 lecture: The Accumulator stages with $project 
