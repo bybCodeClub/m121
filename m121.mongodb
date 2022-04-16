@@ -53,7 +53,7 @@ db.movies.aggregate(pipeline);
       {$match: {"lovejoy": true}},
     ]).itcount()
 
-//chapter 2 homework 1
+//chapter 2 lab 1
      db.movies.aggregate([
         {$match: {cast: { $elemMatch: { $exists: true } }}},
         {$match:{ countries: {$in: ["USA"]}}},
@@ -82,7 +82,7 @@ db.movies.aggregate(pipeline);
         {$sort: { num_favs: -1, "tomatoes.viewer.rating": -1 , title: -1}},
         {$skip : 20}
     ])
-//chapter 2 homework 2
+//chapter 2 lab 2
 // English is an available language, the minimum imdb.rating is at least 1, 
 // the minimum imdb.votes is at least 1, and it was released in 1990 or after. 
 // You'll be required to rescale (or normalize) imdb.votes.
@@ -122,4 +122,28 @@ db.movies.aggregate([
   {$sort: {"_id.directors": -1}}
 ])
 
-// Chapter 3 lecture: The Accumulator stages with $project 
+// Chapter 3 Lab #1: $group and accumlators
+// match awards strings containing oscars
+// split the string and filter out just the Num of oscars? to a new fields numberOfOscars
+// calculate the standard deviation, highest, lowest, and average imdb.rating.
+db.movies.aggregate([
+  {$addFields: { oscarRewards: { $regexFind: { input: "$awards", regex: /Won (.*) (Oscars|Oscar)/ }}}},
+  {$match: {"oscarRewards": {$ne: null}}},
+  {$addFields: {oscarRewardsAsNum: {$toInt: {$arrayElemAt: ["$oscarRewards.captures", 0]}}}},
+  {$group: {
+      _id:null, 
+      highest_rating: {$max: "$imdb.rating" },
+      lowest_rating: {$min: "$imdb.rating" },
+      average_rating: {$avg:"$imdb.rating" },
+      deviation: {$stdDevSamp:"$imdb.rating"},
+  }},
+
+])
+
+// random bits n peices from building pipelines.
+numOscars: {
+        $cond: [{$gt:["$oscarRewardsAsNum", 0]}, "$oscarRewardsAsNum", 0]
+}
+{$sort: {"_id.highest_rating": -1}}
+{$skip: 460}
+numFilms: {$sum: 1},
