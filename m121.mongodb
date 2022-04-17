@@ -140,6 +140,21 @@ db.movies.aggregate([
 
 ])
 
+// chapter 3 lab #2: $unwind stage
+db.movies.aggregate([
+  {$match: {languages: {$in: ['English']}}},
+  {$match: {"imdb.rating": {$gt: 0}}},
+  {$match: {cast: { $elemMatch: { $exists: true } }}},
+  {$unwind: "$cast"},
+  {$group:{
+    _id: {castMember: "$cast"},
+    numFilms: {$sum: 1},
+    average: {$avg: "$imdb.rating"}
+    }
+  },
+  {$sort: {"numFilms": -1}}
+])
+
 // random bits n peices from building pipelines.
 numOscars: {
         $cond: [{$gt:["$oscarRewardsAsNum", 0]}, "$oscarRewardsAsNum", 0]
