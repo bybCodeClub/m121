@@ -155,6 +155,26 @@ db.movies.aggregate([
   {$sort: {"numFilms": -1}}
 ])
 
+// Ch3 lecture: The $lookup stage aka a left outer join (in sql)
+{$lookup: {
+  from: <collection to join>,
+  localField: <filed from the input document>,
+  foreignField: <Field from the documents of the "From" collection>,
+  as: <output array fields>
+}} 
+// Ch3 lab #3: Using $lookup
+db.air_routes.aggregate([
+{$match: {airplane: /747|380/}},
+{$lookup: {
+  from: "air_alliances",
+  localField: "airline.name",
+  foreignField: "airlines",
+  as: "airplanz"
+}}
+])
+
+//todo group and sum??
+
 // random bits n peices from building pipelines.
 numOscars: {
         $cond: [{$gt:["$oscarRewardsAsNum", 0]}, "$oscarRewardsAsNum", 0]
