@@ -245,13 +245,67 @@ db.air_alliances.aggregate([
   }},
   {$match: {isValid: true}},
   {$group: {_id: '$connections.dst_airport'}}
+],{allowDiskUse: true})
+
+
+// Chapter 4. Core aggregations - multidimensional grouping
+// lab: How many movies are in both the top ten highest rated movies according to the
+// imdb.rating and the metacritic fields? We should get these results with exactly one
+// access to the database.. thinking bucket and then sortByCount?
+db.movies.aggregate([
+  {$match: {$and: [
+    { "imdb.rating": {$gte: 0}},
+    { "metacritic": {$gte: 0}},
+  ]}},
+  {$facet: {
+    topTenIMDB: [
+      {$sort: {"imdb.rating": -1, title: 1}},
+      {$limit: 10},
+      {$project: {title: 1, 'imdb.rating': 1}},
+    ],
+    metacriticTop10: [
+      {$sort: {"metacritic": -1, title: 1}},
+      {$limit: 10},
+      {$project: {title: 1, 'metacritic': 1}},
+    ],
+  }},
+  {$project: {topTenIMDB: 1, metacriticTop10: 1, result:{$setIntersection: ['$topTenIMDB', '$metacriticTop10']}}},
 ])
 
+//some notes//
 
-// random bits n peices from building pipelines.
-numOscars: {
-        $cond: [{$gt:["$oscarRewardsAsNum", 0]}, "$oscarRewardsAsNum", 0]
-}
-{$sort: {"_id.highest_rating": -1}}
-{$skip: 460}
-numFilms: {$sum: 1},
+// in a situation where you want to filter out particular items from an array field you could
+// unwind the field and then run a match stage next but this is sub optimal.
+var pipeline = [
+  {$unwind: {
+    'path': '$products',
+  }},
+  {$match: {
+    'products.price': {
+      'gt': NumberDecimal('15.00'),
+    },
+  }},
+  // group is a "blocking stage". aka it's expensive and can be slow
+  {$group: { 
+    _id: '$_id',
+    products: {'$push', '$products'}
+  }},
+];
+// better approach is using an array operator. 
+// note you can use $set and $addFields interchangably. set is an alias for addFields blah blah blah.
+var pipeline = [
+  {$addFields: {
+    products:{
+      '$filter': {
+        'input': '$products',
+        'as': 'product',
+        'cond': {'$gt': ['$$product.price', NumberDecimal('15.00')]},
+      }
+    },
+  }},
+];
+/*  
+One way to recognize if you have this anti-pattern is if your pipeline
+contains a $group on a $_id field. Instead, use Array Operators to avoid 
+introducing a blocking stage
+*/
